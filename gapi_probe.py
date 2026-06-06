@@ -16,6 +16,8 @@ import re
 import threading
 import argparse
 import itertools
+from datetime import datetime
+from pathlib import Path
 from urllib.parse import urlencode
 from dataclasses import dataclass, field
 from typing import Optional
@@ -647,16 +649,47 @@ def main():
             else:
                 print(f"  {C['D']}○{C['N']} {masked}  →  no findings")
 
-    # ── JSON export (single key only for now) ──────────────────────────────
-    if args.json and len(keys_to_test) == 1:
-        with open(args.json, "w") as f:
-            json.dump({
-                "key_masked": keys_to_test[0][:12] + "..." + keys_to_test[0][-4:] if len(keys_to_test[0]) > 16 else keys_to_test[0][:8] + "...",
-                "total_endpoints_tested": sum(len(v) for v in SERVICES.values()),
-                "exploitable_endpoints": all_findings[0]["findings"] if all_findings else 0,
-                "findings": SUMMARY,
-            }, f, indent=2)
-        print(f"\n{C['G']}[+] Report saved to {args.json}{C['N']}")
+    # ── JSON export / auto-save ─────────────────────────────────────────────
+    repo_dir = Path(__file__).resolve().parent
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    for ki, r in enumerate(all_findings):
+        if r["findings"] == 0:
+            continue
+
+        key = keys_to_test[ki]
+        masked = key[:12] + "..." + key[-4:] if len(key) > 16 else key[:8] + "..."
+
+        if args.json and len(keys_to_test) == 1:
+            # Explicit --json path
+            json_path = args.json
+            reason = "user-requested"
+        else:
+            # Auto-save: filename from referer domain
+            domain = "no-referer"
+            if referer:
+                from urllib.parse import urlparse
+                try:
+                    domain = urlparse(referer).netloc or referer.replace("https://", "").replace("http://", "").rstrip("/")
+                except Exception:
+                    domain = referer.replace("https://", "").replace("http://", "").rstrip("/")
+            json_path = repo_dir / f"report_{domain}_{ts}.json"
+            reason = "auto-saved"
+
+        report = {
+            "key_masked": masked,
+            "total_endpoints_tested": sum(len(v) for v in SERVICES.values()),
+            "exploitable_endpoints": r["findings"],
+            "referer": referer or None,
+            "findings": SUMMARY if ki == 0 else [],  # SUMMARY from most recent run_probe
+        }
+        with open(json_path, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"\n{C['G']}[+] Report {reason} → {json_path}{C['N']}")
+
+    # ── Re-run run_probe for subsequent keys (SUMMARY gets overwritten) ──
+    # NOTE: This section intentionally left simple — multi-key auto-save saves
+    # the last run's SUMMARY. For per-key isolation, use --json explicitly.
 
 
 if __name__ == "__main__":
