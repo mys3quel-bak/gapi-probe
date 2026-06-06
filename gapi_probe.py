@@ -84,6 +84,41 @@ class Endpoint:
     impact_desc: str = ""
 
 SERVICES = {
+    "🗺️ Maps (billable)": [
+        Endpoint(
+            "Geocoding",
+            url="https://maps.googleapis.com/maps/api/geocode/json?address=Googleplex&key=***",
+            billable=True, cost_per_call=0.005, cost_unit="request",
+            monthly_volume_desc="1M req/month → ~$5,000/month",
+            valid_status=[200],
+            response_field="",
+            response_value="OK",
+            cvss_if_valid="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N → 5.3 Medium",
+            impact_desc="Geocoding API — attacker can consume quota at $5/1k requests",
+        ),
+        Endpoint(
+            "Places Nearby Search",
+            url="https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=0,0&radius=1&key=***",
+            billable=True, cost_per_call=0.032, cost_unit="request",
+            monthly_volume_desc="1M req/month → ~$32,000/month",
+            valid_status=[200],
+            response_field="",
+            response_value="ZERO_RESULTS",
+            cvss_if_valid="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N → 5.3 Medium",
+            impact_desc="Places API — highest-cost Maps API, $32/1k requests",
+        ),
+        Endpoint(
+            "Directions",
+            url="https://maps.googleapis.com/maps/api/directions/json?origin=Paris&destination=Lyon&key=***",
+            billable=True, cost_per_call=0.005, cost_unit="request",
+            monthly_volume_desc="1M req/month → ~$5,000/month",
+            valid_status=[200],
+            response_field="",
+            response_value="OK",
+            cvss_if_valid="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N → 5.3 Medium",
+            impact_desc="Directions API — billable at $5/1k requests",
+        ),
+    ],
     "🔑 Key Metadata": [
         Endpoint(
             "Key Info (apikeys API)",
@@ -199,41 +234,6 @@ SERVICES = {
             response_field="models",
             cvss_if_valid="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N → 5.4 Medium",
             impact_desc="Vertex AI accessible — may allow training/inference with company models",
-        ),
-    ],
-    "🗺️ Maps (billable)": [
-        Endpoint(
-            "Geocoding",
-            url="https://maps.googleapis.com/maps/api/geocode/json?address=Googleplex&key={KEY}",
-            billable=True, cost_per_call=0.005, cost_unit="request",
-            monthly_volume_desc="1M req/month → ~$5,000/month",
-            valid_status=[200],
-            response_field="",
-            response_value="OK",
-            cvss_if_valid="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N → 5.3 Medium",
-            impact_desc="Geocoding API — attacker can consume quota at $5/1k requests",
-        ),
-        Endpoint(
-            "Places Nearby Search",
-            url="https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=0,0&radius=1&key={KEY}",
-            billable=True, cost_per_call=0.032, cost_unit="request",
-            monthly_volume_desc="1M req/month → ~$32,000/month",
-            valid_status=[200],
-            response_field="",
-            response_value="ZERO_RESULTS",
-            cvss_if_valid="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N → 5.3 Medium",
-            impact_desc="Places API — highest-cost Maps API, $32/1k requests",
-        ),
-        Endpoint(
-            "Directions",
-            url="https://maps.googleapis.com/maps/api/directions/json?origin=Paris&destination=Lyon&key={KEY}",
-            billable=True, cost_per_call=0.005, cost_unit="request",
-            monthly_volume_desc="1M req/month → ~$5,000/month",
-            valid_status=[200],
-            response_field="",
-            response_value="OK",
-            cvss_if_valid="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N → 5.3 Medium",
-            impact_desc="Directions API — billable at $5/1k requests",
         ),
     ],
     "📺 YouTube": [
@@ -559,7 +559,7 @@ def run_probe(key: str, referer: str, service_filter: str = "") -> int:
                 result = test_endpoint(ep, key, referer)
             print_result(ep.name, result, ep)
             tested += 1
-            time.sleep(0.3)
+            time.sleep(2.0 if ep.billable else 0.5)
 
     print_summary()
     return len([s for s in SUMMARY if s["severity"] != "INFO"])
